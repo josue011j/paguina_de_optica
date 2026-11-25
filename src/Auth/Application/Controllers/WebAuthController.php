@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Src\Auth\Infrastructure\Models\UserEloquentModel;
 use Src\Auth\Infrastructure\Requests\LoginRequest;
 
 class WebAuthController extends Controller
@@ -16,13 +17,33 @@ class WebAuthController extends Controller
     public function showLoginForm(): Response
     {
         return Inertia::render('Auth/Login', [
-            'demoAccounts' => app()->environment('local') ? [
-                ['role' => 'Programador', 'email' => 'programador@optica.com'],
-                ['role' => 'Dueño', 'email' => 'dueno@optica.com'],
-                ['role' => 'Vendedor', 'email' => 'vendedor@optica.com'],
-                ['role' => 'Optometrista', 'email' => 'optometrista@optica.com'],
-            ] : [],
+            'demoAccounts' => app()->environment('local') ? $this->existingDemoAccounts() : [],
         ]);
+    }
+
+    /**
+     * Listado de accesos de prueba que realmente existen en la base de datos.
+     *
+     * @return array<int, array{role: string, email: string}>
+     */
+    private function existingDemoAccounts(): array
+    {
+        $accounts = [
+            ['role' => 'Programador', 'email' => 'programador@optica.com'],
+            ['role' => 'Dueño', 'email' => 'dueno@optica.com'],
+            ['role' => 'Vendedor', 'email' => 'vendedor@optica.com'],
+            ['role' => 'Optometrista', 'email' => 'optometrista@optica.com'],
+        ];
+
+        $existentes = UserEloquentModel::query()
+            ->whereIn('email', array_column($accounts, 'email'))
+            ->pluck('email')
+            ->all();
+
+        return array_values(array_filter(
+            $accounts,
+            fn (array $account): bool => in_array($account['email'], $existentes, true),
+        ));
     }
 
     public function login(LoginRequest $request): RedirectResponse
